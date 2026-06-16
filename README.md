@@ -97,8 +97,3 @@ Rotate it after first login (or set `argocd_admin_password` in tfvars to have bo
   competing for port 80.
 - `build.sh` is **superseded** by GitHub Actions and is guarded off.
 
-## Remote state (optional, for real teams)
-
-Local `terraform.tfstate` is gitignored and fine for the exam. To use Azure remote state, create a
-storage account + container once, then uncomment the backend in `terraform/backend.tf` and run
-`terraform init -migrate-state`.
