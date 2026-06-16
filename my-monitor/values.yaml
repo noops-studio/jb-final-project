@@ -1,18 +1,15 @@
 service_type: LoadBalancer
 replicas: 1
-
 ingress:
   enabled: false
   className: nginx
-
 # The image is built and pushed by GitHub Actions to GHCR.
 # pod.tag is updated automatically by CI on every push to dev.
 pod:
   image: "ghcr.io/noops-studio/uptime-kuma"
-  tag: "preflight"   # replaced by the first CI run (workflow_dispatch) BEFORE terraform apply
+  tag: "sha-ac8318b" # replaced by the first CI run (workflow_dispatch) BEFORE terraform apply
   target_port: 3001
   port: 80
-
 # Names of imagePullSecrets, used only if the GHCR package is PRIVATE.
 # Leave empty for a public package (the default in this project).
 imagePullSecrets: []
