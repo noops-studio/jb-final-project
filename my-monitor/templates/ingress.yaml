@@ -5,7 +5,7 @@ metadata:
   name: {{ .Release.Name }}-ing
 
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.ingress.className }}
   rules:
     - http:
        paths:
