@@ -1,0 +1,16 @@
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Real tfvars may contain your IP / subscription id — keep only the example
+*.tfvars
+!*.tfvars.example
+
+# OS junk
+.DS_Store
+**/.DS_Store
