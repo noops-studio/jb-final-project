@@ -46,16 +46,18 @@ resource "azurerm_network_security_group" "this" {
     destination_address_prefix = "*"
   }
 
-  # ArgoCD UI (NodePort 30443): admin only.
+  # ArgoCD UI (NodePort 30443): admin-only by default; open to the whole internet
+  # if argocd_from_anywhere = true. HIGH RISK — ArgoCD is the cluster deploy authority;
+  # rotate the admin password (var.argocd_admin_password) if you expose it.
   security_rule {
-    name                       = "allow-argocd-admin"
+    name                       = "allow-argocd"
     priority                   = 120
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "30443"
-    source_address_prefix      = var.admin_source_address
+    source_address_prefix      = var.argocd_from_anywhere ? "*" : var.admin_source_address
     destination_address_prefix = "*"
   }
 }

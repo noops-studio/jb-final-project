@@ -70,6 +70,12 @@ variable "ssh_from_anywhere" {
   default     = false
 }
 
+variable "argocd_from_anywhere" {
+  description = "TEST ONLY: open the ArgoCD UI (30443) to the whole internet instead of admin_source_address. HIGH RISK — ArgoCD is the cluster deploy authority; the admin password is auto-rotated to a strong value when this is on. Default off."
+  type        = bool
+  default     = false
+}
+
 variable "enable_password_auth" {
   description = "Debug convenience: also enable SSH password login and write a LOCAL plaintext credentials file (terraform/vm-credentials.txt, gitignored). Less secure than key-only; SSH stays NSG-restricted to admin_source_address. Default off."
   type        = bool
