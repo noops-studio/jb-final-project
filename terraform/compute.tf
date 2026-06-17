@@ -34,7 +34,7 @@ resource "azurerm_linux_virtual_machine" "this" {
     argocd_version        = var.argocd_version
     argocd_admin_password = var.argocd_admin_password
     repo_url              = "https://github.com/noops-studio/jb-final-project.git"
-    target_revision       = "dev"
+    target_revision       = "main"
     chart_path            = "my-monitor"
     bootstrap_script      = file("${path.module}/scripts/bootstrap.sh")
   }))

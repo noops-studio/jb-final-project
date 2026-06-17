@@ -1,9 +1,9 @@
 name: build-and-deploy
 
-# Build when app code changes on dev, or run manually for the pre-flight seed.
+# Prod deploy: runs when app code lands on main (e.g. a PR merge), or manually.
 on:
   push:
-    branches: [dev]
+    branches: [main]
     paths:
       - 'uptime-kuma/**'
   workflow_dispatch: {}
@@ -25,10 +25,10 @@ jobs:
   build-push-bump:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout dev
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: main
           fetch-depth: 0
 
       - name: Compute immutable image tag
@@ -81,7 +81,7 @@ jobs:
 
       # Commit the bump back to dev. GITHUB_TOKEN pushes do NOT re-trigger CI,
       # and this file is outside the uptime-kuma/** path filter, so there is no loop.
-      - name: Commit tag bump back to dev
+      - name: Commit tag bump back to main
         env:
           TAG: ${{ steps.vars.outputs.tag }}
         run: |
@@ -93,6 +93,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add my-monitor/values.yaml
           git commit -m "ci: deploy uptime-kuma ${TAG} [skip ci]"
-          git pull --rebase origin dev
-          # Fail loudly if the push is rejected (e.g. dev is branch-protected).
-          git push origin HEAD:dev || { echo "::error::push to dev rejected — dev must be unprotected"; exit 1; }
+          git pull --rebase origin main
+          # Fail loudly if the push is rejected. main must allow the github-actions
+          # bot to push directly (the values bump), e.g. exempt it from required PRs.
+          git push origin HEAD:main || { echo "::error::push to main rejected — allow github-actions to push to main"; exit 1; }
