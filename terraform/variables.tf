@@ -64,6 +64,12 @@ variable "argocd_admin_password" {
   sensitive   = true
 }
 
+variable "ssh_from_anywhere" {
+  description = "TEST ONLY: open SSH (22) to the whole internet (0.0.0.0/0) instead of admin_source_address. ArgoCD UI and the k8s API stay locked to admin_source_address. Default off."
+  type        = bool
+  default     = false
+}
+
 variable "enable_password_auth" {
   description = "Debug convenience: also enable SSH password login and write a LOCAL plaintext credentials file (terraform/vm-credentials.txt, gitignored). Less secure than key-only; SSH stays NSG-restricted to admin_source_address. Default off."
   type        = bool

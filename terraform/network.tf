@@ -32,16 +32,17 @@ resource "azurerm_network_security_group" "this" {
     destination_address_prefix = "*"
   }
 
-  # SSH: admin only.
+  # SSH: admin-only by default; open to the whole internet if ssh_from_anywhere = true
+  # (test VMs only — this is an internet-facing brute-force surface).
   security_rule {
-    name                       = "allow-ssh-admin"
+    name                       = "allow-ssh"
     priority                   = 110
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "22"
-    source_address_prefix      = var.admin_source_address
+    source_address_prefix      = var.ssh_from_anywhere ? "*" : var.admin_source_address
     destination_address_prefix = "*"
   }
 
