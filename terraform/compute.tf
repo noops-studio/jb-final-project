@@ -40,7 +40,6 @@ resource "azurerm_linux_virtual_machine" "this" {
     vm_public_ip          = azurerm_public_ip.this.ip_address
     k8s_namespace         = var.k8s_namespace
     argocd_version        = var.argocd_version
-    argocd_chart_version  = var.argocd_chart_version
     argocd_admin_password = local.argocd_admin_password
     repo_url              = "https://github.com/noops-studio/jb-final-project.git"
     target_revision       = "dev"

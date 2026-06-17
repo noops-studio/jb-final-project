@@ -3,8 +3,8 @@
 Deploys [uptime-kuma](https://github.com/louislam/uptime-kuma) to a single Azure VM using:
 
 - **Terraform** — creates an Azure VM + network in an *existing* resource group and runs cloud-init.
-- **cloud-init** — installs single-node **k3s**, installs **ArgoCD via its official Helm chart**, and registers one ArgoCD `Application`.
-- **Tooling mix** — **Helm** installs ArgoCD **and** packages the app (`my-monitor/` chart); ArgoCD drives GitOps.
+- **cloud-init** — installs single-node **k3s**, installs **ArgoCD** (upstream manifests), and registers one ArgoCD `Application`.
+- **Tooling mix** — the app is packaged as a **Helm** chart (`my-monitor/`); ArgoCD drives GitOps.
 - **GitHub Actions** — builds the image, pushes it to **GHCR**, and bumps the Helm image tag.
 - **ArgoCD (GitOps)** — watches `my-monitor/` (Helm) on `dev` and deploys every change automatically.
 
