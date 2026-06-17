@@ -36,10 +36,15 @@ kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 retry 5 15 kubectl apply -n argocd --server-side \
   -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 
-log "Waiting for the ArgoCD CRD and core workloads..."
+log "Waiting for the ArgoCD CRD and the FULL ArgoCD stack to be ready..."
 retry 30 10 kubectl wait --for=condition=established crd/applications.argoproj.io --timeout=20s
-retry 60 10 kubectl -n argocd rollout status deploy/argocd-server --timeout=30s
+# The application-controller (a StatefulSet) is what actually syncs Applications.
+retry 60 10 kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=30s
 retry 60 10 kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=30s
+retry 60 10 kubectl -n argocd rollout status deploy/argocd-server --timeout=30s
+retry 60 10 kubectl -n argocd rollout status deploy/argocd-redis --timeout=30s
+# Belt-and-suspenders: every ArgoCD pod Ready before we proceed.
+retry 30 10 kubectl -n argocd wait --for=condition=Ready pod --all --timeout=30s
 
 log "Exposing the ArgoCD UI on NodePort 30443 (HTTPS)..."
 kubectl -n argocd patch svc argocd-server --type merge -p \
@@ -56,7 +61,17 @@ fi
 log "Creating the app namespace ${APP_NAMESPACE}..."
 kubectl create namespace "${APP_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
-log "Applying the ArgoCD Application (GitOps takes over from here)..."
+log "Applying the ArgoCD Application..."
 retry 10 10 kubectl apply -n argocd -f /opt/bootstrap/application.yaml
 
-log "Bootstrap complete. ArgoCD will deploy the app on its next sync."
+log "Waiting for ArgoCD to sync and the app to become Healthy..."
+# Wait for the Application to report Synced, then Healthy (needs the image pulled
+# and the readiness probe passing). jsonpath waits are supported on modern kubectl.
+retry 30 15 kubectl -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced \
+  application/uptime-kuma --timeout=20s
+retry 30 15 kubectl -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy \
+  application/uptime-kuma --timeout=20s
+# And confirm the actual workload rolled out in the app namespace.
+retry 30 10 kubectl -n "${APP_NAMESPACE}" rollout status deploy/uptime-kuma --timeout=30s
+
+log "Bootstrap complete. uptime-kuma is deployed, Synced and Healthy."
