@@ -7,11 +7,19 @@ resource "azurerm_linux_virtual_machine" "this" {
   network_interface_ids = [azurerm_network_interface.this.id]
   tags                  = local.tags
 
+  # Key auth is always on. Password auth is opt-in (var.enable_password_auth) for
+  # debugging convenience; SSH is still NSG-restricted to var.admin_source_address.
+  disable_password_authentication = !var.enable_password_auth
+  admin_password                  = var.enable_password_auth ? random_password.vm.result : null
+
   admin_ssh_key {
     username = var.admin_username
     # pathexpand handles a leading ~ in the key path.
     public_key = file(pathexpand(var.ssh_public_key_path))
   }
+
+  # Serial console + boot log via Azure (readable even when SSH/NSG blocks you).
+  boot_diagnostics {}
 
   os_disk {
     caching              = "ReadWrite"
