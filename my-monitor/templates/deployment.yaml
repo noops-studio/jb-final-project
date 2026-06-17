@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  replicas: {{ .Values.replicas }}   # from values (SQLite is single-writer: keep at 1)
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ .Release.Name }}
+        image: {{ .Values.pod.image }}:{{ .Values.pod.tag }}   # from values
+        ports:
+        - containerPort: {{ .Values.pod.target_port }}
+        readinessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.pod.target_port }}
+          initialDelaySeconds: 20
+          periodSeconds: 10

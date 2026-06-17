@@ -31,24 +31,26 @@ retry 5 10 bash -c 'curl -sfL https://get.k3s.io | sh -s -'
 log "Waiting for the node to be Ready..."
 retry 30 10 kubectl wait --for=condition=Ready node --all --timeout=20s
 
-log "Installing ArgoCD ${ARGOCD_VERSION}..."
-kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-retry 5 15 kubectl apply -n argocd --server-side \
-  -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+log "Installing the Helm CLI..."
+retry 5 10 bash -c 'curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash'
 
-log "Waiting for the ArgoCD CRD and the FULL ArgoCD stack to be ready..."
+# ArgoCD is installed via its OFFICIAL HELM CHART; the app is ALSO a Helm chart (my-monitor/).
+# The NodePort 30443 (HTTPS) UI is configured through Helm values instead of a kubectl patch.
+log "Installing ArgoCD via Helm chart ${ARGOCD_CHART_VERSION} (argocd app ${ARGOCD_VERSION})..."
+retry 3 10 helm repo add argo https://argoproj.github.io/argo-helm
+retry 3 10 helm repo update
+retry 2 20 helm upgrade --install argocd argo/argo-cd \
+  --namespace argocd --create-namespace \
+  --version "${ARGOCD_CHART_VERSION}" \
+  --set server.service.type=NodePort \
+  --set server.service.nodePortHttps=30443 \
+  --wait --timeout 8m
+
+log "Verifying the ArgoCD CRD and the full stack are ready..."
 retry 30 10 kubectl wait --for=condition=established crd/applications.argoproj.io --timeout=20s
 # The application-controller (a StatefulSet) is what actually syncs Applications.
 retry 60 10 kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=30s
-retry 60 10 kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=30s
-retry 60 10 kubectl -n argocd rollout status deploy/argocd-server --timeout=30s
-retry 60 10 kubectl -n argocd rollout status deploy/argocd-redis --timeout=30s
-# Belt-and-suspenders: every ArgoCD pod Ready before we proceed.
 retry 30 10 kubectl -n argocd wait --for=condition=Ready pod --all --timeout=30s
-
-log "Exposing the ArgoCD UI on NodePort 30443 (HTTPS)..."
-kubectl -n argocd patch svc argocd-server --type merge -p \
-  '{"spec":{"type":"NodePort","ports":[{"name":"https","port":443,"targetPort":8080,"nodePort":30443}]}}'
 
 if [ -n "${ARGOCD_ADMIN_PASSWORD}" ]; then
   log "Setting the ArgoCD admin password..."

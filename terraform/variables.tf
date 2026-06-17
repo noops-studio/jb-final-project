@@ -53,8 +53,14 @@ variable "enable_kube_api_6443" {
 }
 
 variable "argocd_version" {
-  description = "Pinned ArgoCD release to install, e.g. v2.13.3."
+  description = "ArgoCD app version this deploy targets (for logging/reference), e.g. v2.13.3."
   type        = string
+}
+
+variable "argocd_chart_version" {
+  description = "Pinned argo/argo-cd HELM CHART version to install, e.g. 7.7.0 (maps to ArgoCD ~2.13). Bump if the version is unavailable."
+  type        = string
+  default     = "7.7.0"
 }
 
 variable "argocd_admin_password" {
