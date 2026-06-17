@@ -4,13 +4,13 @@ Deploys [uptime-kuma](https://github.com/louislam/uptime-kuma) to a single Azure
 
 - **Terraform** — creates an Azure VM + network in an *existing* resource group and runs cloud-init.
 - **cloud-init** — installs single-node **k3s**, installs **ArgoCD**, and registers one ArgoCD `Application`.
-- **GitHub Actions** — builds the image, pushes it to **GHCR**, and bumps the Helm tag.
-- **ArgoCD (GitOps)** — watches `my-monitor/` on `dev` and deploys every change automatically.
+- **GitHub Actions** — builds the image, pushes it to **GHCR**, and `kustomize edit set image`.
+- **ArgoCD (GitOps)** — watches `k8s/` (Kustomize) on `dev` and deploys every change automatically.
 
 ```
 push code ──▶ GitHub Actions ──▶ ghcr.io/.../uptime-kuma:sha-xxxx
                      │
-                     └─ bump my-monitor/values.yaml ──▶ commit to dev
+                     └─ kustomize set image in k8s/ ──▶ commit to dev
                                                               │
                                               ArgoCD sees the change
                                                               │
@@ -36,8 +36,8 @@ first ArgoCD sync needs an image that already exists in GHCR. Follow this order:
 
 1. Push this repo to `dev` (or merge it) so the workflow exists on GitHub.
 2. Run the workflow once manually: **Actions ▸ build-and-deploy ▸ Run workflow ▸ branch `dev`**.
-   - It builds `ghcr.io/noops-studio/uptime-kuma:sha-<short>` and commits that real tag into
-     `my-monitor/values.yaml` (replacing the `preflight` placeholder).
+   - It builds `ghcr.io/noops-studio/uptime-kuma:sha-<short>` and `kustomize edit set image`
+     writes that real tag into `k8s/kustomization.yaml`, committed back to `dev`.
 3. Make the GHCR package **public** (so k3s can pull without a secret):
    **Profile ▸ Packages ▸ uptime-kuma ▸ Package settings ▸ Change visibility ▸ Public.**
 4. Verify an anonymous pull works:

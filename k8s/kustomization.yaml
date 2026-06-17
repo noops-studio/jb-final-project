@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# All resources land in this namespace (ArgoCD also targets it with CreateNamespace=true).
+namespace: final-project
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# CI updates newTag via: kustomize edit set image uptime-kuma=ghcr.io/noops-studio/uptime-kuma:sha-XXXX
+# ArgoCD then PULLS this committed change and rolls the Deployment.
+images:
+  - name: uptime-kuma
+    newName: ghcr.io/noops-studio/uptime-kuma
+    newTag: sha-ac8318b

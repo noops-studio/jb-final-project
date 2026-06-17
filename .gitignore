@@ -14,3 +14,4 @@ crash.*.log
 # OS junk
 .DS_Store
 **/.DS_Store
+docs/
