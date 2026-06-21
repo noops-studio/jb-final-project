@@ -13,18 +13,21 @@ spec:
     targetRevision: "dev"
     path: "my-monitor"
     helm:
-      # ALL values for this app live HERE, not in my-monitor/values.yaml.
+      # ALL values for this app live HERE. A genuinely DIFFERENT instance:
+      # an OLDER pinned image tag and its own NodePort. CI bumps app #1 only,
+      # so this one stays pinned to the version below.
       values: |
-        service_type: LoadBalancer
+        service_type: NodePort
         replicas: 1
         ingress:
           enabled: false
           className: nginx
         pod:
           image: "ghcr.io/noops-studio/uptime-kuma"
-          tag: "sha-0f5e5b7"
+          tag: "sha-d1862c0"   # older build than app #1 (sha-0f5e5b7) — pinned, not auto-bumped
           target_port: 3001
           port: 80
+          node_port: 30081     # reach at http://<vm-ip>:30081 (app #1 keeps port 80)
         imagePullSecrets: []
   destination:
     server: https://kubernetes.default.svc

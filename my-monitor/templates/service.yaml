@@ -10,9 +10,12 @@ spec:
   {{ else }}
   type: {{ .Values.service_type }}  #from values
   {{ end }}
-  ports:         
-  - name: http   
+  ports:
+  - name: http
     protocol: TCP
     port: {{ .Values.pod.port }} #from Values
     targetPort: {{ .Values.pod.target_port }}  #from values
+    {{- if and (eq .Values.service_type "NodePort") .Values.pod.node_port }}
+    nodePort: {{ .Values.pod.node_port }}  # fixed NodePort, only when set
+    {{- end }}
 
