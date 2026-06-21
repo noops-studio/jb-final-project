@@ -3,6 +3,15 @@ kind: Application
 metadata:
   name: uptime-kuma2
   namespace: argocd
+  # ---- CI build metadata (read by .github/workflows/build-and-deploy.yml) ----
+  # Same SOURCE as app #1 but a DIFFERENT image name. CI builds this folder and
+  # pushes it under the uptime-kuma2 name, then bumps this file's pod.tag.
+  annotations:
+    build/context: "uptime-kuma"
+    build/dockerfile: "uptime-kuma/docker/dockerfile"
+    build/target: "rootless"
+    build/frontend: "true"
+    build/image: "ghcr.io/noops-studio/uptime-kuma2"  # DIFFERENT image name from app #1
   # Keep the app from being pruned before its dependents finalize cleanly.
   finalizers:
     - resources-finalizer.argocd.argoproj.io
