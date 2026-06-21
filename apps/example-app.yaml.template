@@ -1,0 +1,40 @@
+# COPY this file to a real `<your-app>.yaml` in this folder, fill in the
+# placeholders, commit + push. The root ArgoCD Application watches this folder
+# and will deploy your app automatically. Delete the file -> ArgoCD removes it.
+#
+# This is an ArgoCD Application. It can point at a Helm chart OR a folder of
+# plain Kubernetes manifests, in THIS repo or any other public git repo.
+# Its VALUES live in THIS file (under source.helm.values) — not in the chart.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: CHANGE-ME            # unique app name (kebab-case)
+  namespace: argocd          # always argocd — this is where Applications live
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/noops-studio/jb-final-project.git"
+    targetRevision: "dev"    # branch, tag, or commit
+    path: "PATH/IN/REPO"     # folder holding your chart or k8s manifests
+    # If PATH points at a HELM CHART, put this app's values inline here.
+    # They override the chart's own values.yaml — so the chart stays generic
+    # and every app keeps its config in its own file in apps/.
+    helm:
+      values: |
+        # key: value
+        # nested:
+        #   key: value
+    # If PATH points at a folder of PLAIN manifests instead, delete the whole
+    # `helm:` block above — there are no values to set.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: CHANGE-ME-NAMESPACE   # namespace to deploy INTO (auto-created)
+  syncPolicy:
+    automated:
+      prune: true            # delete resources removed from git
+      selfHeal: true         # revert manual cluster drift back to git
+    syncOptions:
+      - CreateNamespace=true
+  revisionHistoryLimit: 3

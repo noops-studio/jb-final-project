@@ -1,0 +1,91 @@
+#cloud-config
+# Rendered by Terraform (templatefile). Placeholders written as dollar-brace NAME
+# are replaced by the matching variables passed in compute.tf. The bootstrap
+# script is injected whole via the bootstrap_script variable, so its own shell
+# dollar syntax is left untouched.
+
+package_update: true
+
+write_files:
+  - path: /etc/rancher/k3s/config.yaml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      write-kubeconfig-mode: "0600"
+      disable:
+        - traefik
+      tls-san:
+        - "${vm_public_ip}"
+
+  - path: /opt/bootstrap/bootstrap.env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      ARGOCD_VERSION="${argocd_version}"
+      ARGOCD_ADMIN_PASSWORD="${argocd_admin_password}"
+
+  # The ROOT app (App-of-Apps). Applied ONCE at bootstrap. It watches the
+  # apps/ folder in the repo: every Application YAML dropped there is deployed
+  # automatically. Adding a new app means committing a file to apps/ — no
+  # Terraform re-run and no SSH needed.
+  - path: /opt/bootstrap/root-app.yaml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: root-app
+        namespace: argocd
+        finalizers:
+          - resources-finalizer.argocd.argoproj.io
+      spec:
+        project: default
+        source:
+          repoURL: "${repo_url}"
+          targetRevision: "${target_revision}"
+          path: "${apps_path}"
+          directory:
+            recurse: true
+            include: "*.yaml"
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: argocd
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          syncOptions:
+            - CreateNamespace=true
+        revisionHistoryLimit: 3
+
+  - path: /opt/bootstrap/bootstrap.sh
+    permissions: "0700"
+    owner: root:root
+    content: |
+      ${indent(6, bootstrap_script)}
+
+  - path: /etc/systemd/system/k3s-bootstrap.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Bootstrap k3s, ArgoCD and the app
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=true
+      Restart=on-failure
+      RestartSec=15
+      ExecStart=/opt/bootstrap/bootstrap.sh
+      StandardOutput=append:/var/log/k3s-bootstrap.log
+      StandardError=append:/var/log/k3s-bootstrap.log
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl enable --now k3s-bootstrap.service

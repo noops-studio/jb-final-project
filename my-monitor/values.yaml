@@ -1,11 +1,17 @@
+# These are GENERIC chart DEFAULTS only.
+# The REAL per-deployment values live inline in apps/uptime-kuma.yaml
+# (spec.source.helm.values) and OVERRIDE everything here. CI bumps the
+# image tag THERE, not here. Edit apps/uptime-kuma.yaml to change a running app.
 service_type: LoadBalancer
 replicas: 1
-
 ingress:
   enabled: false
-
+  className: nginx
 pod:
-  image: "snoopa/uptime-kuma"
-  tag: "1"
+  image: "ghcr.io/noops-studio/uptime-kuma"
+  tag: "sha-8bd773c" # overridden by apps/uptime-kuma.yaml (CI keeps that one current)
   target_port: 3001
   port: 80
+# Names of imagePullSecrets, used only if the GHCR package is PRIVATE.
+# Leave empty for a public package (the default in this project).
+imagePullSecrets: []

@@ -1,0 +1,183 @@
+name: build-and-deploy
+
+# Generic App-of-Apps CI. Builds EVERY app in apps/ that declares build
+# metadata (build/* annotations), pushes its image, and bumps its inline tag.
+# Adding a new buildable app = drop a file in apps/ with build/* annotations;
+# no change to this workflow is needed.
+on:
+  push:
+    branches: [dev]
+    # NO paths filter on purpose. A new app may live in ANY new source folder
+    # (apps/<x>.yaml + <x>/ Dockerfile), so we cannot pre-list the paths or the
+    # new app's first push would be ignored and never built. We run on every
+    # push to dev instead. Loops are prevented two ways: the bump commit carries
+    # [skip ci], and docker layer cache makes unchanged rebuilds cheap.
+  workflow_dispatch: {}
+
+# Never run two builds of the same ref at once (avoids racing commit-backs).
+concurrency:
+  group: build-and-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+# Least privilege: write packages (GHCR) and contents (commit the tag bumps).
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # 1) Discover every buildable app in apps/ and emit a build matrix.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.scan.outputs.matrix }}
+      any: ${{ steps.scan.outputs.any }}
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Compute immutable image tag (one short SHA for the whole run)
+        id: tag
+        run: echo "tag=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Build a JSON array of {file,name,context,dockerfile,target,frontend,image}
+      # from every apps/*.yaml that has a build/context annotation.
+      - name: Scan apps/ for buildable apps
+        id: scan
+        run: |
+          # Build a JSON array; one entry per apps/*.yaml that declares
+          # build/context. Done per-file so each entry carries its own path.
+          entries='[]'
+          for f in apps/*.yaml; do
+            [ -e "$f" ] || continue
+            ctx="$(yq '.metadata.annotations["build/context"] // ""' "$f")"
+            [ -n "$ctx" ] && [ "$ctx" != "null" ] || continue
+            entry="$(FILE="$f" yq -o=json -I=0 '
+              {
+                "file":       env(FILE),
+                "name":       .metadata.name,
+                "context":    .metadata.annotations["build/context"],
+                "dockerfile": .metadata.annotations["build/dockerfile"],
+                "target":     (.metadata.annotations["build/target"]   // ""),
+                "frontend":   (.metadata.annotations["build/frontend"] // "false"),
+                "image":      .metadata.annotations["build/image"]
+              }' "$f")"
+            entries="$(echo "$entries" | yq -p=json -o=json -I=0 ". + [${entry}]")"
+          done
+          echo "matrix=${entries}" >> "$GITHUB_OUTPUT"
+          if [ "$(echo "$entries" | yq 'length')" -gt 0 ]; then
+            echo "any=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Discovered apps to build:"; echo "$entries" | yq -P
+
+  # 2) Build + push one image per discovered app (in parallel).
+  build:
+    needs: discover
+    if: needs.discover.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Set up Node
+        if: matrix.app.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Some images (uptime-kuma) need the vite frontend built first, since the
+      # Dockerfile build stage does not run vite and dist/ is gitignored.
+      - name: Build frontend (vite dist/)
+        if: matrix.app.frontend == 'true'
+        working-directory: ${{ matrix.app.context }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.app.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.app.context }}
+          file: ${{ matrix.app.dockerfile }}
+          target: ${{ matrix.app.target }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ matrix.app.image }}:${{ needs.discover.outputs.tag }}
+          # Per-app cache scope so apps that share a source folder don't thrash.
+          cache-from: type=gha,scope=${{ matrix.app.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app.name }}
+
+  # 3) After every image is pushed, bump each app's inline image+tag once and
+  #    commit the whole set back to dev in a single commit (no races).
+  bump-and-commit:
+    needs: [discover, build]
+    if: needs.discover.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.discover.outputs.tag }}
+      MATRIX: ${{ needs.discover.outputs.matrix }}
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      # For each discovered app, write its image NAME and the new TAG into the
+      # inline helm.values (.spec.source.helm.values is a YAML string).
+      - name: Bump image + tag in every app's inline Helm values
+        run: |
+          echo "$MATRIX" | yq -p=json -o=json -I=0 '.[]' | while read -r app; do
+            file="$(echo "$app"  | yq -p=json '.file')"
+            image="$(echo "$app" | yq -p=json '.image')"
+            echo "Bumping $file -> ${image}:${TAG}"
+            IMG="$image" TG="$TAG" yq -i '
+              .spec.source.helm.values |= (
+                from_yaml
+                | .pod.image = strenv(IMG)
+                | .pod.tag   = strenv(TG)
+                | to_yaml
+              )
+            ' "$file"
+          done
+          echo "=== resulting image/tag lines ==="
+          for f in apps/*.yaml; do
+            echo "--- $f ---"
+            yq '.spec.source.helm.values' "$f" 2>/dev/null | grep -E "image:|tag:" || true
+          done
+
+      # One commit for all bumps. GITHUB_TOKEN pushes do NOT re-trigger CI.
+      - name: Commit bumps back to dev
+        run: |
+          if git diff --quiet -- apps/; then
+            echo "No app tag changes, nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/
+          git commit -m "ci: deploy apps ${TAG} [skip ci]"
+          git pull --rebase origin dev
+          git push origin HEAD:dev || { echo "::error::push to dev rejected — allow github-actions to push to dev"; exit 1; }

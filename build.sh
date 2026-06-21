@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# SUPERSEDED: image build + push now happens in GitHub Actions
+# (.github/workflows/build-and-deploy.yml), which pushes to GHCR.
+# This script pushed a MUTABLE tag to Docker Hub and would diverge the
+# deployed image from what ArgoCD tracks. Kept for local reference only.
+if [ "${ALLOW_LEGACY_BUILD:-0}" != "1" ]; then
+  echo "build.sh is superseded by GitHub Actions (GHCR)."
+  echo "Set ALLOW_LEGACY_BUILD=1 to run it anyway (not recommended)."
+  exit 1
+fi
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: uptime-kuma
+  namespace: argocd
+  # ---- CI build metadata (read by .github/workflows/build-and-deploy.yml) ----
+  # An app WITH build/context gets built+pushed by CI and its pod.tag bumped.
+  # An app WITHOUT these annotations is deploy-only (e.g. an upstream image).
+  annotations:
+    build/context: "uptime-kuma" # docker build context (source folder)
+    build/dockerfile: "uptime-kuma/docker/dockerfile" # path to the Dockerfile
+    build/target: "rootless" # Dockerfile target stage
+    build/frontend: "true" # run `npm ci && npm run build` first (vite dist/)
+    build/image: "ghcr.io/noops-studio/uptime-kuma" # image name to push (and write into pod.image)
+  # Keep the app from being pruned before its dependents finalize cleanly.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/noops-studio/jb-final-project.git"
+    targetRevision: "dev"
+    path: "my-monitor"
+    helm:
+      # ALL values for this app live HERE, not in my-monitor/values.yaml.
+      # These override the chart defaults. CI rewrites pod.image / pod.tag
+      # in THIS block on every push to dev (see .github/workflows).
+      values: |
+        service_type: LoadBalancer
+        replicas: 1
+        ingress:
+          enabled: false
+          className: nginx
+        pod:
+          image: "ghcr.io/noops-studio/uptime-kuma"
+          tag: "sha-cc58cc6" # bumped by CI
+          target_port: 3001
+          port: 80
+        imagePullSecrets: []
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "apps"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  revisionHistoryLimit: 3

@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+subscription_id      = "00000000-0000-0000-0000-000000000000"
+resource_group_name  = "my-existing-rg"
+k8s_namespace        = "uptime-kuma"
+ssh_public_key_path  = "~/.ssh/id_ed25519.pub"
+admin_source_address = "203.0.113.7/32" # YOUR ip as a /32 — never 0.0.0.0/0
+argocd_version       = "v2.13.3"
+
+# Optional overrides:
+# location              = "westeurope"
+# vm_size               = "Standard_B2s_v2"
+# enable_kube_api_6443  = false
+# argocd_admin_password = "choose-a-strong-password"
