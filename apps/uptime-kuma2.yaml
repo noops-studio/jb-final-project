@@ -23,8 +23,10 @@ spec:
           enabled: false
           className: nginx
         pod:
-          image: "ghcr.io/noops-studio/uptime-kuma"
-          tag: "sha-d1862c0"   # older build than app #1 (sha-0f5e5b7) — pinned, not auto-bumped
+          # DIFFERENT image NAME from app #1 (uptime-kuma2, not uptime-kuma).
+          # CI must build+push this name before it exists in GHCR — see TODO below.
+          image: "ghcr.io/noops-studio/uptime-kuma2"
+          tag: "sha-d1862c0"   # pinned; CI will bump this once the uptime-kuma2 build is wired
           target_port: 3001
           port: 80
           node_port: 30081     # reach at http://<vm-ip>:30081 (app #1 keeps port 80)
