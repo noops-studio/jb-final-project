@@ -7,11 +7,11 @@ metadata:
   # An app WITH build/context gets built+pushed by CI and its pod.tag bumped.
   # An app WITHOUT these annotations is deploy-only (e.g. an upstream image).
   annotations:
-    build/context: "uptime-kuma"                      # docker build context (source folder)
+    build/context: "uptime-kuma" # docker build context (source folder)
     build/dockerfile: "uptime-kuma/docker/dockerfile" # path to the Dockerfile
-    build/target: "rootless"                          # Dockerfile target stage
-    build/frontend: "true"                            # run `npm ci && npm run build` first (vite dist/)
-    build/image: "ghcr.io/noops-studio/uptime-kuma"   # image name to push (and write into pod.image)
+    build/target: "rootless" # Dockerfile target stage
+    build/frontend: "true" # run `npm ci && npm run build` first (vite dist/)
+    build/image: "ghcr.io/noops-studio/uptime-kuma" # image name to push (and write into pod.image)
   # Keep the app from being pruned before its dependents finalize cleanly.
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -33,7 +33,7 @@ spec:
           className: nginx
         pod:
           image: "ghcr.io/noops-studio/uptime-kuma"
-          tag: "sha-0f5e5b7" # bumped by CI
+          tag: "sha-cc58cc6" # bumped by CI
           target_port: 3001
           port: 80
         imagePullSecrets: []
