@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: uptime-kuma2
+  namespace: argocd
+  # Keep the app from being pruned before its dependents finalize cleanly.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/noops-studio/jb-final-project.git"
+    targetRevision: "dev"
+    path: "my-monitor"
+    helm:
+      # ALL values for this app live HERE, not in my-monitor/values.yaml.
+      values: |
+        service_type: LoadBalancer
+        replicas: 1
+        ingress:
+          enabled: false
+          className: nginx
+        pod:
+          image: "ghcr.io/noops-studio/uptime-kuma"
+          tag: "sha-0f5e5b7"
+          target_port: 3001
+          port: 80
+        imagePullSecrets: []
+  destination:
+    server: https://kubernetes.default.svc
+    # Separate namespace so the two apps don't collide.
+    namespace: "apps2"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  revisionHistoryLimit: 3
