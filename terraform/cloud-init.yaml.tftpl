@@ -22,27 +22,35 @@ write_files:
     owner: root:root
     content: |
       ARGOCD_VERSION="${argocd_version}"
-      APP_NAMESPACE="${k8s_namespace}"
       ARGOCD_ADMIN_PASSWORD="${argocd_admin_password}"
 
-  - path: /opt/bootstrap/application.yaml
+  # The ROOT app (App-of-Apps). Applied ONCE at bootstrap. It watches the
+  # apps/ folder in the repo: every Application YAML dropped there is deployed
+  # automatically. Adding a new app means committing a file to apps/ — no
+  # Terraform re-run and no SSH needed.
+  - path: /opt/bootstrap/root-app.yaml
     permissions: "0600"
     owner: root:root
     content: |
       apiVersion: argoproj.io/v1alpha1
       kind: Application
       metadata:
-        name: uptime-kuma
+        name: root-app
         namespace: argocd
+        finalizers:
+          - resources-finalizer.argocd.argoproj.io
       spec:
         project: default
         source:
           repoURL: "${repo_url}"
           targetRevision: "${target_revision}"
-          path: "${chart_path}"
+          path: "${apps_path}"
+          directory:
+            recurse: true
+            include: "*.yaml"
         destination:
           server: https://kubernetes.default.svc
-          namespace: "${k8s_namespace}"
+          namespace: argocd
         syncPolicy:
           automated:
             prune: true

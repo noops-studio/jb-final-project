@@ -32,8 +32,9 @@ variable "ssh_public_key_path" {
 }
 
 variable "k8s_namespace" {
-  description = "Kubernetes namespace ArgoCD deploys the app into."
+  description = "DEPRECATED / unused. The deploy namespace now lives in each app file under apps/ (spec.destination.namespace), e.g. apps/uptime-kuma.yaml. Kept only so existing terraform.tfvars don't break."
   type        = string
+  default     = ""
 }
 
 variable "admin_source_address" {

@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: uptime-kuma
+  namespace: argocd
+  # Keep the app from being pruned before its dependents finalize cleanly.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/noops-studio/jb-final-project.git"
+    targetRevision: "dev"
+    path: "my-monitor"
+    helm:
+      # ALL values for this app live HERE, not in my-monitor/values.yaml.
+      # These override the chart defaults. CI rewrites pod.image / pod.tag
+      # in THIS block on every push to dev (see .github/workflows).
+      values: |
+        service_type: LoadBalancer
+        replicas: 1
+        ingress:
+          enabled: false
+          className: nginx
+        pod:
+          image: "ghcr.io/noops-studio/uptime-kuma"
+          tag: "sha-0f5e5b7" # bumped by CI
+          target_port: 3001
+          port: 80
+        imagePullSecrets: []
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "apps"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  revisionHistoryLimit: 3

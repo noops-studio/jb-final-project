@@ -38,12 +38,11 @@ resource "azurerm_linux_virtual_machine" "this" {
   # The bootstrap script is passed in whole so Terraform does not touch its $ syntax.
   custom_data = base64encode(templatefile("${path.module}/cloud-init.yaml.tftpl", {
     vm_public_ip          = azurerm_public_ip.this.ip_address
-    k8s_namespace         = var.k8s_namespace
     argocd_version        = var.argocd_version
     argocd_admin_password = local.argocd_admin_password
     repo_url              = "https://github.com/noops-studio/jb-final-project.git"
     target_revision       = "dev"
-    chart_path            = "my-monitor"
+    apps_path             = "apps"
     bootstrap_script      = file("${path.module}/scripts/bootstrap.sh")
   }))
 }

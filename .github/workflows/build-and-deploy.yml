@@ -70,14 +70,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Update the Helm chart so ArgoCD redeploys the new immutable tag.
-      - name: Bump image tag in Helm values
+      # The app's values live INLINE in apps/uptime-kuma.yaml (App-of-Apps),
+      # NOT in my-monitor/values.yaml. The values are a YAML string under
+      # .spec.source.helm.values, so we parse that string (from_yaml), bump the
+      # image/tag, and re-emit it (to_yaml). ArgoCD then redeploys the new tag.
+      - name: Bump image tag in the app's inline Helm values
         env:
           TAG: ${{ steps.vars.outputs.tag }}
           IMAGE_REPO: ${{ env.IMAGE }}
         run: |
-          yq -i '.pod.image = strenv(IMAGE_REPO) | .pod.tag = strenv(TAG)' my-monitor/values.yaml
-          echo "values.yaml now:"; grep -E "image:|tag:" my-monitor/values.yaml
+          yq -i '
+            .spec.source.helm.values |= (
+              from_yaml
+              | .pod.image = strenv(IMAGE_REPO)
+              | .pod.tag   = strenv(TAG)
+              | to_yaml
+            )
+          ' apps/uptime-kuma.yaml
+          echo "apps/uptime-kuma.yaml inline values now:"
+          yq '.spec.source.helm.values' apps/uptime-kuma.yaml | grep -E "image:|tag:"
 
       # Commit the bump back to dev. GITHUB_TOKEN pushes do NOT re-trigger CI,
       # and this file is outside the uptime-kuma/** path filter, so there is no loop.
@@ -85,13 +96,13 @@ jobs:
         env:
           TAG: ${{ steps.vars.outputs.tag }}
         run: |
-          if git diff --quiet -- my-monitor/values.yaml; then
-            echo "No change to values.yaml, nothing to commit."
+          if git diff --quiet -- apps/uptime-kuma.yaml; then
+            echo "No change to apps/uptime-kuma.yaml, nothing to commit."
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add my-monitor/values.yaml
+          git add apps/uptime-kuma.yaml
           git commit -m "ci: deploy uptime-kuma ${TAG} [skip ci]"
           git pull --rebase origin dev
           # Fail loudly if the push is rejected (e.g. dev is branch-protected).

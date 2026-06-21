@@ -59,20 +59,26 @@ if [ -n "${ARGOCD_ADMIN_PASSWORD}" ]; then
     "{\"stringData\":{\"admin.password\":\"${HASH}\",\"admin.passwordMtime\":\"$(date +%FT%T%Z)\"}}"
 fi
 
-log "Creating the app namespace ${APP_NAMESPACE}..."
-kubectl create namespace "${APP_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+log "Applying the ROOT ArgoCD Application (App-of-Apps over apps/)..."
+retry 10 10 kubectl apply -n argocd -f /opt/bootstrap/root-app.yaml
 
-log "Applying the ArgoCD Application..."
-retry 10 10 kubectl apply -n argocd -f /opt/bootstrap/application.yaml
-
-log "Waiting for ArgoCD to sync and the app to become Healthy..."
-# Wait for the Application to report Synced, then Healthy (needs the image pulled
-# and the readiness probe passing). jsonpath waits are supported on modern kubectl.
+log "Waiting for the root app to sync and pull in the child Applications..."
+# The root app applies every Application in apps/. Wait for it to be Synced/Healthy,
+# then wait for the child apps it created to appear and become Healthy too.
 retry 30 15 kubectl -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced \
-  application/uptime-kuma --timeout=20s
+  application/root-app --timeout=20s
 retry 30 15 kubectl -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy \
-  application/uptime-kuma --timeout=20s
-# And confirm the actual workload rolled out in the app namespace.
-retry 30 10 kubectl -n "${APP_NAMESPACE}" rollout status deploy/uptime-kuma --timeout=30s
+  application/root-app --timeout=20s
 
-log "Bootstrap complete. uptime-kuma is deployed, Synced and Healthy."
+log "Waiting for every child app in apps/ to become Synced and Healthy..."
+# The root app creates one child Application per file in apps/. Wait for ALL of
+# them generically — no app is named here, so adding/removing files in apps/
+# needs no change to this script. Namespaces are auto-created by ArgoCD
+# (CreateNamespace=true on each app).
+retry 30 15 kubectl -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced \
+  application --all --timeout=20s
+retry 30 15 kubectl -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy \
+  application --all --timeout=20s
+
+log "Bootstrap complete. Root app + all child apps in apps/ are Synced and Healthy."
+log "Drop new Application YAMLs into apps/ and push — they deploy automatically."
